@@ -1,0 +1,19 @@
+---
+manifest_version: "1"
+name: gated_dna
+integrity:
+  network_seed: ~
+  properties: ~
+  origin_time: 1690551301926966
+  zomes:
+    - name: gated_dna_integrity
+      hash: ~
+      bundled: "../../../target/wasm32-unknown-unknown/release/gated_dna_integrity.wasm"
+      dependencies: ~
+coordinator:
+  zomes:
+    - name: gated_dna
+      hash: ~
+      bundled: "../../../target/wasm32-unknown-unknown/release/gated_dna.wasm"
+      dependencies:
+        - name: gated_dna_integrity

@@ -1,0 +1,7 @@
+---
+manifest_version: "1"
+name: token-memproof
+ui:
+  bundled: "../ui/dist.zip"
+happ_manifest:
+  bundled: "./token-memproof.happ"

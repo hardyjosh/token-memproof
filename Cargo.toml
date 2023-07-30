@@ -1,0 +1,19 @@
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"
+
+[workspace]
+members = ["dnas/*/zomes/coordinator/*", "dnas/*/zomes/integrity/*"]
+
+[workspace.dependencies]
+hdi = "=0.2.3"
+hdk = "=0.1.3"
+serde = "1"
+
+[workspace.dependencies.gated_dna]
+path = "dnas/gated_dna/zomes/coordinator/gated_dna"
+
+[workspace.dependencies.gated_dna_integrity]
+path = "dnas/gated_dna/zomes/integrity/gated_dna"

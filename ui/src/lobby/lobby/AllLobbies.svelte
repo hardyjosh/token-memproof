@@ -9,8 +9,8 @@
     NewEntryAction,
   } from "@holochain/client";
   import { clientContext } from "../../contexts";
-  import PostDetail from "./PostDetail.svelte";
-  import type { GatedDnaSignal } from "./types";
+  import TokenGatedRoomDetail from "./TokenGatedRoomDetail.svelte";
+  import type { LobbySignal } from "./types";
   import { Spinner } from "flowbite-svelte";
 
   let client: AppAgentClient = (getContext(clientContext) as any).getClient();
@@ -22,23 +22,23 @@
   $: hashes, loading, error;
 
   onMount(async () => {
-    await fetchPosts();
+    await fetchTokenGatedRooms();
     client.on("signal", (signal) => {
-      if (signal.zome_name !== "gated_dna") return;
-      const payload = signal.payload as GatedDnaSignal;
+      if (signal.zome_name !== "lobby") return;
+      const payload = signal.payload as LobbySignal;
       if (payload.type !== "EntryCreated") return;
-      if (payload.app_entry.type !== "Post") return;
+      if (payload.app_entry.type !== "TokenGatedRoom") return;
       hashes = [...hashes, payload.action.hashed.hash];
     });
   });
 
-  async function fetchPosts() {
+  async function fetchTokenGatedRooms() {
     try {
       const records = await client.callZome({
         cap_secret: null,
-        role_name: "gated_dna",
-        zome_name: "gated_dna",
-        fn_name: "get_all_posts",
+        role_name: "lobby",
+        zome_name: "lobby",
+        fn_name: "get_all_lobbies",
         payload: null,
       });
       hashes = records.map((r) => r.signed_action.hashed.hash);
@@ -56,14 +56,17 @@
     <Spinner />
   </div>
 {:else if error}
-  <span>Error fetching the posts: {error.data.data}.</span>
+  <span>Error fetching the token gated rooms: {error.data.data}.</span>
 {:else if hashes.length === 0}
-  <span>No posts found.</span>
+  <span>No token gated rooms found.</span>
 {:else}
   <div style="display: flex; flex-direction: column">
     {#each hashes as hash}
       <div style="margin-bottom: 8px;">
-        <PostDetail postHash={hash} on:post-deleted={() => fetchPosts()} />
+        <TokenGatedRoomDetail
+          tokenGatedRoomHash={hash}
+          on:token-gated-room-deleted={() => fetchTokenGatedRooms()}
+        />
       </div>
     {/each}
   </div>

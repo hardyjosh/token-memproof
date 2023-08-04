@@ -1,6 +1,7 @@
 ---
 manifest_version: "1"
 name: gated_dna
+clone_limit: 10
 integrity:
   network_seed: ~
   properties: ~

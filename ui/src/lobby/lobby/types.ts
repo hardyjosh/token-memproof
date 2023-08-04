@@ -12,7 +12,7 @@ import type {
   DeleteLink
 } from '@holochain/client';
 
-export type GatedDnaSignal = {
+export type LobbySignal = {
   type: 'EntryCreated';
   action: SignedActionHashed<Create>;
   app_entry: EntryTypes;
@@ -36,17 +36,17 @@ export type GatedDnaSignal = {
 };
 
 export type EntryTypes =
-  | ({ type: 'Post'; } & Post);
+  | ({ type: 'TokenGatedRoom'; } & TokenGatedRoom);
 
 
 
-export interface Post {
-  message: string;
-}
-
-export interface AppProperties {
+export interface TokenGatedRoom {
   name: string;
-  signer: string;
-  token: string;
+
+  token: Uint8Array;
+
+  signer: Uint8Array;
+
   threshold: number;
 }
+

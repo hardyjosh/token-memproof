@@ -1,25 +1,30 @@
-pub mod post;
-pub use post::*;
+pub mod token_gated_room;
+pub use token_gated_room::*;
 use hdi::prelude::*;
-#[derive(Serialize, Deserialize, SerializedBytes, Debug)]
-pub struct AppProperties {
-    pub signer: String,
-    pub token: String,
-    pub threshold: u32,
-}
-
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[hdk_entry_defs]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
-    Post(Post),
+    TokenGatedRoom(TokenGatedRoom),
 }
 #[derive(Serialize, Deserialize)]
 #[hdk_link_types]
 pub enum LinkTypes {
-    PostUpdates,
-    AllPosts,
+    AllLobbies,
+}
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct ByteArray(#[serde(with = "serde_bytes")] Vec<u8>);
+impl ByteArray {
+    // Add a public method to create a new ByteArray from a Vec<u8>
+    pub fn new(vec: Vec<u8>) -> Self {
+        ByteArray(vec)
+    }
+    
+    // Add a public method to convert ByteArray into a Vec<u8>
+    pub fn into_vec(self) -> Vec<u8> {
+        self.0
+    }
 }
 #[hdk_extern]
 pub fn genesis_self_check(
@@ -31,19 +36,8 @@ pub fn validate_agent_joining(
     _agent_pub_key: AgentPubKey,
     _membrane_proof: &Option<MembraneProof>,
 ) -> ExternResult<ValidateCallbackResult> {
-    // return Ok(ValidateCallbackResult::Invalid(String::from("nope")));
-    debug!("Hello from debug!");
-    println!("Hello from println!");
-    let dna_info: Result<AppProperties, _> = dna_info().ok().unwrap().properties.try_into();
-    match dna_info {
-        Ok(dna_info) => {
-            info!("dna_info {:?}", dna_info);
-            // implement the check against the membrane proof here
-            debug!("dna_info: {:?}", dna_info);
-            Ok(ValidateCallbackResult::Valid)
-        }
-        Err(_) => Ok(ValidateCallbackResult::Invalid(String::from("didn't work")))
-    }
+    // do signature validation etc here
+    Ok(ValidateCallbackResult::Valid)
 }
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
@@ -52,20 +46,20 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             match store_entry {
                 OpEntry::CreateEntry { app_entry, action } => {
                     match app_entry {
-                        EntryTypes::Post(post) => {
-                            validate_create_post(
+                        EntryTypes::TokenGatedRoom(token_gated_room) => {
+                            validate_create_token_gated_room(
                                 EntryCreationAction::Create(action),
-                                post,
+                                token_gated_room,
                             )
                         }
                     }
                 }
                 OpEntry::UpdateEntry { app_entry, action, .. } => {
                     match app_entry {
-                        EntryTypes::Post(post) => {
-                            validate_create_post(
+                        EntryTypes::TokenGatedRoom(token_gated_room) => {
+                            validate_create_token_gated_room(
                                 EntryCreationAction::Update(action),
-                                post,
+                                token_gated_room,
                             )
                         }
                     }
@@ -82,12 +76,15 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     action,
                 } => {
                     match (app_entry, original_app_entry) {
-                        (EntryTypes::Post(post), EntryTypes::Post(original_post)) => {
-                            validate_update_post(
+                        (
+                            EntryTypes::TokenGatedRoom(token_gated_room),
+                            EntryTypes::TokenGatedRoom(original_token_gated_room),
+                        ) => {
+                            validate_update_token_gated_room(
                                 action,
-                                post,
+                                token_gated_room,
                                 original_action,
-                                original_post,
+                                original_token_gated_room,
                             )
                         }
                         _ => {
@@ -107,8 +104,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             match delete_entry {
                 OpDelete::Entry { original_action, original_app_entry, action } => {
                     match original_app_entry {
-                        EntryTypes::Post(post) => {
-                            validate_delete_post(action, original_action, post)
+                        EntryTypes::TokenGatedRoom(token_gated_room) => {
+                            validate_delete_token_gated_room(
+                                action,
+                                original_action,
+                                token_gated_room,
+                            )
                         }
                     }
                 }
@@ -123,16 +124,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             action,
         } => {
             match link_type {
-                LinkTypes::PostUpdates => {
-                    validate_create_link_post_updates(
-                        action,
-                        base_address,
-                        target_address,
-                        tag,
-                    )
-                }
-                LinkTypes::AllPosts => {
-                    validate_create_link_all_posts(
+                LinkTypes::AllLobbies => {
+                    validate_create_link_all_lobbies(
                         action,
                         base_address,
                         target_address,
@@ -150,17 +143,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             action,
         } => {
             match link_type {
-                LinkTypes::PostUpdates => {
-                    validate_delete_link_post_updates(
-                        action,
-                        original_action,
-                        base_address,
-                        target_address,
-                        tag,
-                    )
-                }
-                LinkTypes::AllPosts => {
-                    validate_delete_link_all_posts(
+                LinkTypes::AllLobbies => {
+                    validate_delete_link_all_lobbies(
                         action,
                         original_action,
                         base_address,
@@ -174,10 +158,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             match store_record {
                 OpRecord::CreateEntry { app_entry, action } => {
                     match app_entry {
-                        EntryTypes::Post(post) => {
-                            validate_create_post(
+                        EntryTypes::TokenGatedRoom(token_gated_room) => {
+                            validate_create_token_gated_room(
                                 EntryCreationAction::Create(action),
-                                post,
+                                token_gated_room,
                             )
                         }
                     }
@@ -203,18 +187,18 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         }
                     };
                     match app_entry {
-                        EntryTypes::Post(post) => {
-                            let result = validate_create_post(
+                        EntryTypes::TokenGatedRoom(token_gated_room) => {
+                            let result = validate_create_token_gated_room(
                                 EntryCreationAction::Update(action.clone()),
-                                post.clone(),
+                                token_gated_room.clone(),
                             )?;
                             if let ValidateCallbackResult::Valid = result {
-                                let original_post: Option<Post> = original_record
+                                let original_token_gated_room: Option<TokenGatedRoom> = original_record
                                     .entry()
                                     .to_app_option()
                                     .map_err(|e| wasm_error!(e))?;
-                                let original_post = match original_post {
-                                    Some(post) => post,
+                                let original_token_gated_room = match original_token_gated_room {
+                                    Some(token_gated_room) => token_gated_room,
                                     None => {
                                         return Ok(
                                             ValidateCallbackResult::Invalid(
@@ -224,11 +208,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                                         );
                                     }
                                 };
-                                validate_update_post(
+                                validate_update_token_gated_room(
                                     action,
-                                    post,
+                                    token_gated_room,
                                     original_action,
-                                    original_post,
+                                    original_token_gated_room,
                                 )
                             } else {
                                 Ok(result)
@@ -288,8 +272,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         }
                     };
                     match original_app_entry {
-                        EntryTypes::Post(original_post) => {
-                            validate_delete_post(action, original_action, original_post)
+                        EntryTypes::TokenGatedRoom(original_token_gated_room) => {
+                            validate_delete_token_gated_room(
+                                action,
+                                original_action,
+                                original_token_gated_room,
+                            )
                         }
                     }
                 }
@@ -301,16 +289,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     action,
                 } => {
                     match link_type {
-                        LinkTypes::PostUpdates => {
-                            validate_create_link_post_updates(
-                                action,
-                                base_address,
-                                target_address,
-                                tag,
-                            )
-                        }
-                        LinkTypes::AllPosts => {
-                            validate_create_link_all_posts(
+                        LinkTypes::AllLobbies => {
+                            validate_create_link_all_lobbies(
                                 action,
                                 base_address,
                                 target_address,
@@ -342,17 +322,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         }
                     };
                     match link_type {
-                        LinkTypes::PostUpdates => {
-                            validate_delete_link_post_updates(
-                                action,
-                                create_link.clone(),
-                                base_address,
-                                create_link.target_address,
-                                create_link.tag,
-                            )
-                        }
-                        LinkTypes::AllPosts => {
-                            validate_delete_link_all_posts(
+                        LinkTypes::AllLobbies => {
+                            validate_delete_link_all_lobbies(
                                 action,
                                 create_link.clone(),
                                 base_address,

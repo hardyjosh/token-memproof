@@ -1,0 +1,19 @@
+---
+manifest_version: "1"
+name: lobby
+integrity:
+  network_seed: ~
+  properties: ~
+  origin_time: 1690819864141840
+  zomes:
+    - name: lobby_integrity
+      hash: ~
+      bundled: "../../../target/wasm32-unknown-unknown/release/lobby_integrity.wasm"
+      dependencies: ~
+coordinator:
+  zomes:
+    - name: lobby
+      hash: ~
+      bundled: "../../../target/wasm32-unknown-unknown/release/lobby.wasm"
+      dependencies:
+        - name: lobby_integrity

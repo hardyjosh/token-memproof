@@ -1,19 +1,57 @@
 <script lang="ts">
-  import { onMount, setContext } from 'svelte';
-  import type { ActionHash, AppAgentClient } from '@holochain/client';
-  import { AppAgentWebsocket } from '@holochain/client';
-  import '@material/mwc-circular-progress';
+  import { onMount, setContext } from "svelte";
+  import type { ActionHash, AppAgentClient, AppInfo } from "@holochain/client";
+  import { AppAgentWebsocket } from "@holochain/client";
+  import AllPosts from "./gated_dna/gated_dna/AllPosts.svelte";
+  import CreatePost from "./gated_dna/gated_dna/CreatePost.svelte";
+  import { Button, Heading, Input, Spinner } from "flowbite-svelte";
 
-  import { clientContext } from './contexts';
+  import { clientContext } from "./contexts";
+  import CreateClone from "./gated_dna/gated_dna/CreateClone.svelte";
+  import AllLobbies from "./lobby/lobby/AllLobbies.svelte";
+
+  import { configureChains } from "@wagmi/core";
+  import { mainnet, polygon } from "@wagmi/core/chains";
+  import { createConfig, account } from "svelte-wagmi-stores";
+  // this example also uses Web3Modal - you'll need to install this yourself
+  import { Web3Modal } from "@web3modal/html";
+  import {
+    EthereumClient,
+    w3mConnectors,
+    w3mProvider,
+  } from "@web3modal/ethereum";
+
+  // all this boilerplate is from the web3modal docs
+  const chains = [mainnet];
+  const projectId = "ed03fa277413d0dc05fcc318b714c759";
+
+  const { publicClient } = configureChains(chains, [
+    w3mProvider({ projectId }),
+  ]);
+
+  // except here we're using createConfig form this package instead of wagmi
+  const wagmiConfig = createConfig({
+    autoConnect: false,
+    connectors: w3mConnectors({ projectId, chains }),
+    publicClient,
+  });
+
+  const ethereumClient = new EthereumClient(wagmiConfig, chains);
+
+  let web3modal: Web3Modal;
+  web3modal = new Web3Modal({ projectId }, ethereumClient);
+  web3modal.setDefaultChain(mainnet);
 
   let client: AppAgentClient | undefined;
   let loading = true;
+  let info: AppInfo | undefined;
 
-  $: client, loading;
+  $: client, loading, info;
 
   onMount(async () => {
     // We pass '' as url because it will dynamically be replaced in launcher environments
-    client = await AppAgentWebsocket.connect('', 'token-memproof');
+    client = await AppAgentWebsocket.connect("", "token-memproof");
+    info = await client.appInfo();
     loading = false;
   });
 
@@ -23,43 +61,19 @@
 </script>
 
 <main>
+  <span class="text-blue-500 text-2xl">Memproof</span>
+  <Button on:click={web3modal.openModal}>Connect Wallet</Button>
   {#if loading}
-    <div style="display: flex; flex: 1; align-items: center; justify-content: center">
-      <mwc-circular-progress indeterminate />
+    <div class="flex">
+      <Spinner />
     </div>
-  {:else}
-    <div id="content" style="display: flex; flex-direction: column; flex: 1;">
-      <h2>EDIT ME! Add the components of your app here.</h2>
-
-      <span>Look in the <code>ui/src/DNA/ZOME</code> folders for UI elements that are generated with <code>hc scaffold entry-type</code>, <code>hc scaffold collection</code> and <code>hc scaffold link-type</code> and add them here as appropriate.</span>
-        
-      <span>For example, if you have scaffolded a "todos" dna, a "todos" zome, a "todo_item" entry type, and a collection called "all_todos", you might want to add an element here to create and list your todo items, with the generated <code>ui/src/todos/todos/AllTodos.svelte</code> and <code>ui/src/todos/todos/CreateTodo.svelte</code> elements.</span>
-          
-      <span>So, to use those elements here:</span>
-      <ol>
-        <li>Import the elements with:
-        <pre>
-import AllTodos from './todos/todos/AllTodos.svelte';
-import CreateTodo from './todos/todos/CreateTodo.svelte';
-        </pre>
-        </li>
-        <li>Replace this "EDIT ME!" section with <code>&lt;CreateTodo&gt;&lt;/CreateTodo&gt;&lt;AllTodos&gt;&lt;/AllTodos&gt;</code>.</li>
-        </ol>
-    </div>
+  {:else if info}
+    <!-- <pre>{JSON.stringify(info.cell_info, null, 2)}</pre> -->
+    <span
+      >{info.cell_info.gated_dna[0]?.provisioned.dna_modifiers.properties}</span
+    >
+    <AllPosts />
+    <CreateClone />
+    <AllLobbies />
   {/if}
 </main>
-
-<style>
-  main {
-    text-align: center;
-    padding: 1em;
-    max-width: 240px;
-    margin: 0 auto;
-  }
-
-  @media (min-width: 640px) {
-    main {
-      max-width: none;
-    }
-  }
-</style>

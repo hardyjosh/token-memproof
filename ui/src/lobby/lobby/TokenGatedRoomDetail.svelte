@@ -1,21 +1,20 @@
 <script lang="ts">
+  import { currentGatedClone } from "./../../contexts.ts";
   import { createEventDispatcher, onMount, getContext } from "svelte";
   import { decode, encode } from "@msgpack/msgpack";
-  import {
-    type Record,
-    type ActionHash,
-    type AppAgentClient,
-    type EntryHash,
-    type AgentPubKey,
-    type DnaHash,
-    encodeHashToBase64,
-    type RoleName,
+  import type {
+    Record,
+    ActionHash,
+    AppAgentClient,
+    AgentPubKey,
+    DnaHash,
+    RoleName,
   } from "@holochain/client";
   import { clientContext } from "../../contexts";
   import type { MemProof, TokenGatedRoom } from "./types";
-  import { bytesToBigint, formatEther, formatUnits, toHex } from "viem";
+  import { bytesToBigint, formatEther, toHex } from "viem";
   import { fetchToken } from "@wagmi/core";
-  import { account, walletClient } from "svelte-wagmi-stores";
+  import { account } from "svelte-wagmi-stores";
   import { Button } from "flowbite-svelte";
   import CreatePost from "../../gated_dna/gated_dna/CreatePost.svelte";
   import { getEvmKeyBinding } from "../../lib/evm_key_binding";
@@ -65,7 +64,7 @@
     };
     encodedDnaProperties = encode(dnaProperties);
     // console.log((await client.appInfo()).cell_info.gated_dna);
-    const matchingClone = (await client.appInfo()).cell_info.gated_dna.find(
+    const existingClone = (await client.appInfo()).cell_info.gated_dna.find(
       (cell) => {
         if (!cell?.cloned?.dna_modifiers?.properties) return false;
         return areUint8ArraysEqual(
@@ -75,9 +74,9 @@
       }
     )?.cloned;
     // console.log({ matchingClone });
-    if (matchingClone) {
-      cellId = matchingClone.cell_id;
-      cloneId = matchingClone.clone_id;
+    if (existingClone) {
+      cellId = existingClone.cell_id;
+      cloneId = existingClone.clone_id;
     }
   });
 
@@ -121,9 +120,8 @@
     loading = false;
   }
 
-  const createClone = async () => {
+  const joinRoom = async () => {
     const evmKeyBinding = await getEvmKeyBinding(client);
-    // console.log(evmKeyBinding);
     const tokenProof = await fetchTokenProof(
       80001,
       tokenGatedRoom.token,
@@ -133,7 +131,6 @@
       evm_key_binding: evmKeyBinding.evmKeyBinding,
       token_proof: tokenProof,
     };
-    // console.log(tokenProof);
     const clone = await client
       .createCloneCell({
         role_name: "gated_dna",
@@ -144,19 +141,9 @@
         membrane_proof: encode(membrane_proof),
       })
       .catch((e) => console.log(e));
-    console.log(clone);
     cellId = clone?.cell_id;
     cloneId = clone?.clone_id;
-    const decoded = decode(
-      clone.dna_modifiers.properties
-    ) as TokenGatedRoomDisplay;
-    // console.log(decoded);
   };
-
-  // $: console.log({
-  //   dna: encodeHashToBase64(cellId?.[0] || new Uint8Array(0)),
-  //   agentKey: encodeHashToBase64(cellId?.[1] || new Uint8Array(0)),
-  // });
 </script>
 
 {#if loading}
@@ -168,7 +155,7 @@
 {:else if error}
   <span>Error fetching the token gated room: {error?.data?.data || error}</span>
 {:else}
-  <div class="flex flex-col">
+  <div class="flex flex-col gap-y-2">
     <div class="flex flex-col">
       <span><strong>Name:</strong></span>
       <span>{tokenGatedRoomDisplay.name}</span>
@@ -183,12 +170,16 @@
     </div>
     <div class="flex flex-col">
       <span><strong>Threshold:</strong></span>
-      <span>{tokenGatedRoomDisplay.threshold}</span>
+      <span>{tokenGatedRoomDisplay.threshold} </span>
     </div>
-    <Button on:click={createClone}>Join room</Button>
     {#if cellId}
-      <CreatePost {cellId} />
-      <AllPosts {cellId} />
+      <Button
+        on:click={() => {
+          $currentGatedClone = cellId;
+        }}>Enter room</Button
+      >
+    {:else}
+      <Button on:click={joinRoom}>Join room</Button>
     {/if}
   </div>
 {/if}

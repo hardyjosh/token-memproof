@@ -11,13 +11,16 @@
   import { clientContext } from "../../contexts";
   import TokenGatedRoomDetail from "./TokenGatedRoomDetail.svelte";
   import type { LobbySignal } from "./types";
-  import { Spinner } from "flowbite-svelte";
+  import { Button, Spinner } from "flowbite-svelte";
+  import CreateTokenGatedRoom from "./CreateTokenGatedRoom.svelte";
 
   let client: AppAgentClient = (getContext(clientContext) as any).getClient();
 
   let hashes: Array<ActionHash> | undefined;
   let loading = true;
   let error: any = undefined;
+
+  let showCreateTokenGatedRoom = false;
 
   $: hashes, loading, error;
 
@@ -60,14 +63,34 @@
 {:else if hashes.length === 0}
   <span>No token gated rooms found.</span>
 {:else}
-  <div style="display: flex; flex-direction: column">
+  <div class="w-screen flex justify-between p-4 pb-0">
+    <span>{hashes?.length} rooms found</span>
+    <Button
+      on:click={() => {
+        console.log("clicked room");
+        showCreateTokenGatedRoom = true;
+      }}>Create Room</Button
+    >
+  </div>
+  <div class="grid grid-cols-3 gap-8 p-4">
     {#each hashes as hash}
-      <div style="margin-bottom: 8px;">
+      <div class="border rounded-xl p-4">
         <TokenGatedRoomDetail
           tokenGatedRoomHash={hash}
           on:token-gated-room-deleted={() => fetchTokenGatedRooms()}
         />
       </div>
     {/each}
+  </div>
+{/if}
+{#if showCreateTokenGatedRoom}
+  <div
+    class="fixed inset-0 w-screen h-screen flex flex-col justify-center items-center z-100 bg-gray-800 bg-opacity-70"
+  >
+    <CreateTokenGatedRoom
+      on:room-created={() => {
+        showCreateTokenGatedRoom = false;
+      }}
+    />
   </div>
 {/if}

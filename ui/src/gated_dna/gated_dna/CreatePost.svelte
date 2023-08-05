@@ -23,8 +23,6 @@
 
   let message: string = "";
 
-  let errorSnackbar;
-
   $: message;
   $: isPostValid = true && message !== "";
 
@@ -48,22 +46,19 @@
         payload: postEntry,
       });
       dispatch("post-created", { postHash: record.signed_action.hashed.hash });
+      message = "";
     } catch (e) {
       addSnackBar(`Error creating the evm key binding: ${e?.data?.data || e}`);
-      // errorSnackbar.labelText = `Error creating the post: ${
-      //   e?.data?.data || e
-      // }`;
-      // errorSnackbar.show();
     }
   }
 </script>
 
-<div class="flex flex-col gap-y-4">
-  <span class="text-lg">Create Post</span>
-
+<div class="flex gap-x-4">
   <Input type="text" bind:value={message} required />
 
-  <Button disabled={!isPostValid} on:click={() => createPost()}>
-    Create Post</Button
-  >
+  <div class="flex-shrink-0">
+    <Button disabled={!isPostValid} on:click={() => createPost()}>
+      Create Post</Button
+    >
+  </div>
 </div>

@@ -1,13 +1,16 @@
 <script lang="ts">
+  import { toHex } from "viem";
   import { onMount, setContext } from "svelte";
-  import type { ActionHash, AppAgentClient, AppInfo } from "@holochain/client";
+  import {
+    encodeHashToBase64,
+    type AppAgentClient,
+    type CellId,
+  } from "@holochain/client";
   import { AppAgentWebsocket } from "@holochain/client";
   import AllPosts from "./gated_dna/gated_dna/AllPosts.svelte";
-  import CreatePost from "./gated_dna/gated_dna/CreatePost.svelte";
-  import { Button, Heading, Input, Spinner } from "flowbite-svelte";
+  import { Spinner } from "flowbite-svelte";
 
-  import { clientContext } from "./contexts";
-  import CreateClone from "./gated_dna/gated_dna/CreateClone.svelte";
+  import { clientContext, currentGatedClone } from "./contexts";
   import AllLobbies from "./lobby/lobby/AllLobbies.svelte";
 
   import { configureChains } from "@wagmi/core";
@@ -22,6 +25,9 @@
   } from "@web3modal/ethereum";
   import Snackbar from "./lib/snackbar/Snackbar.svelte";
   import CreateEvmKeyBinding from "./lobby/lobby/CreateEvmKeyBinding.svelte";
+  import ConnectWallet from "./ConnectWallet.svelte";
+  import { getEvmKeyBinding } from "./lib/evm_key_binding";
+  import type { EvmKeyBinding } from "./lobby/lobby/types";
 
   // all this boilerplate is from the web3modal docs
   const chains = [polygonMumbai];
@@ -46,13 +52,14 @@
 
   let client: AppAgentClient | undefined;
   let loading = true;
-  let info: AppInfo | undefined;
+  let evmKeyBinding: EvmKeyBinding | undefined;
 
-  $: client, loading, info;
+  $: client, loading;
 
   onMount(async () => {
     // We pass '' as url because it will dynamically be replaced in launcher environments
     client = await AppAgentWebsocket.connect("", "token-memproof");
+    ({ evmKeyBinding } = await getEvmKeyBinding(client));
     loading = false;
   });
 
@@ -61,17 +68,38 @@
   });
 </script>
 
-<main>
-  <span class="text-blue-500 text-2xl">Memproof</span>
-  <Button on:click={web3modal.openModal}>Connect Wallet</Button>
-  {#if loading}
-    <div class="flex">
-      <Spinner />
+<main class="relative w-full">
+  <div class="flex justify-between p-4 border-b">
+    <span class="text-blue-500 text-2xl">Memproof</span>
+    <div class="flex flex-row text-sm gap-x-4">
+      <div class="flex flex-col">
+        <span>Bound EVM key</span>
+        <span>
+          {#if evmKeyBinding}
+            {toHex(evmKeyBinding.evm_key)}
+          {:else}
+            None
+          {/if}
+        </span>
+      </div>
+      <div class="flex flex-col">
+        <span>Agent pubkey</span>
+        {#if client?.myPubKey}
+          <span>{encodeHashToBase64(client.myPubKey)}</span>
+        {/if}
+      </div>
     </div>
-  {:else}
-    <CreateClone />
-    <AllLobbies />
+  </div>
+  {#if loading}
+    <Spinner />
+  {:else if $currentGatedClone}
+    <AllPosts cellId={$currentGatedClone} />
+  {:else if !$account?.isConnected}
+    <ConnectWallet {web3modal} />
+  {:else if !evmKeyBinding}
     <CreateEvmKeyBinding />
+  {:else}
+    <AllLobbies />
   {/if}
   <Snackbar />
 </main>

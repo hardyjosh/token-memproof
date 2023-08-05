@@ -29,8 +29,6 @@
 
   let editing = false;
 
-  let errorSnackbar: Snackbar;
-
   $: editing, error, loading, record, post;
 
   onMount(async () => {
@@ -78,21 +76,14 @@
         payload: postHash,
       });
       dispatch("post-deleted", { postHash: postHash });
-    } catch (e: any) {
-      errorSnackbar.labelText = `Error deleting the post: ${e.data.data}`;
-      errorSnackbar.show();
-    }
+    } catch (e: any) {}
   }
 </script>
-
-<mwc-snackbar bind:this={errorSnackbar} leading />
 
 {#if loading}
   <div
     style="display: flex; flex: 1; align-items: center; justify-content: center"
-  >
-    <mwc-circular-progress indeterminate />
-  </div>
+  />
 {:else if error}
   <span>Error fetching the post: {error.data.data}</span>
 {:else}

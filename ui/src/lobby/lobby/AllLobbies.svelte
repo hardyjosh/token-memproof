@@ -60,14 +60,11 @@
   </div>
 {:else if error}
   <span>Error fetching the token gated rooms: {error?.data?.data}.</span>
-{:else if hashes.length === 0}
-  <span>No token gated rooms found.</span>
 {:else}
   <div class="w-screen flex justify-between p-4 pb-0">
     <span>{hashes?.length} rooms found</span>
     <Button
       on:click={() => {
-        console.log("clicked room");
         showCreateTokenGatedRoom = true;
       }}>Create Room</Button
     >

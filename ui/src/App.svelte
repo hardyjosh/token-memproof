@@ -59,9 +59,13 @@
   onMount(async () => {
     // We pass '' as url because it will dynamically be replaced in launcher environments
     client = await AppAgentWebsocket.connect("", "token-memproof");
-    ({ evmKeyBinding } = await getEvmKeyBinding(client));
+    await _getEvmKeyBinding();
     loading = false;
   });
+
+  const _getEvmKeyBinding = async () => {
+    ({ evmKeyBinding } = await getEvmKeyBinding(client));
+  };
 
   setContext(clientContext, {
     getClient: () => client,
@@ -74,13 +78,14 @@
     <div class="flex flex-row text-sm gap-x-4">
       <div class="flex flex-col">
         <span>Bound EVM key</span>
-        <span>
+        <span on:click={web3modal.openModal()}>
           {#if evmKeyBinding}
             {toHex(evmKeyBinding.evm_key)}
           {:else}
             None
           {/if}
         </span>
+        <span>Connected wallet: {$account?.address}</span>
       </div>
       <div class="flex flex-col">
         <span>Agent pubkey</span>
@@ -97,7 +102,11 @@
   {:else if !$account?.isConnected}
     <ConnectWallet {web3modal} />
   {:else if !evmKeyBinding}
-    <CreateEvmKeyBinding />
+    <CreateEvmKeyBinding
+      on:evm-key-binding-created={() => {
+        _getEvmKeyBinding();
+      }}
+    />
   {:else}
     <AllLobbies />
   {/if}

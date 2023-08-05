@@ -10,6 +10,8 @@
   import { toBytes, toHex } from "viem";
   import { addSnackBar } from "../../lib/snackbar/snackbar";
 
+  $: console.log($walletClient, $account);
+
   let client: AppAgentClient = (getContext(clientContext) as any).getClient();
 
   const dispatch = createEventDispatcher();
@@ -75,12 +77,6 @@
           {formatAddress(toHex(client.myPubKey))}
         </div>
       </div>
-      <Alert color="green" class="text-lg"
-        ><IconOutline name="ticket-outline" class="inline" />
-        Membership proof obtained - you hold 1000 MintMe tokens which means you are
-        eligible to join this happ.</Alert
-      >
-
       <Button
         class="text-xl"
         disabled={!$account.isConnected}

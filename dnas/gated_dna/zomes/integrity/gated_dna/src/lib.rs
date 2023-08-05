@@ -1,13 +1,47 @@
 pub mod post;
+use std::sync::Arc;
+use ethers_core::types::{H160, RecoveryMessage, U256};
 pub use post::*;
 use hdi::prelude::*;
-#[derive(Serialize, Deserialize, SerializedBytes, Debug)]
+#[hdk_entry_helper]
 pub struct AppProperties {
+    pub name: String,
     pub signer: String,
     pub token: String,
-    pub threshold: u32,
+    pub threshold: String,
 }
-
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct ByteArray(#[serde(with = "serde_bytes")] Vec<u8>);
+impl ByteArray {
+    pub fn new(vec: Vec<u8>) -> Self {
+        ByteArray(vec)
+    }
+    pub fn into_vec(self) -> Vec<u8> {
+        self.0
+    }
+}
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[serde(tag = "type")]
+pub struct EvmKeyBinding {
+    pub evm_key: ByteArray,
+    pub signature_bytes: ByteArray,
+}
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[serde(tag = "type")]
+pub struct TokenProof {
+    token: ByteArray,
+    owner: ByteArray,
+    signer_address: ByteArray,
+    balance: ByteArray,
+    block: ByteArray,
+    message: ByteArray,
+    signature: ByteArray,
+  }
+#[hdk_entry_helper]
+pub struct MemProof {
+    evm_key_binding: EvmKeyBinding,
+    token_proof: TokenProof,
+}
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[hdk_entry_defs]
@@ -25,25 +59,117 @@ pub enum LinkTypes {
 pub fn genesis_self_check(
     _data: GenesisSelfCheckData,
 ) -> ExternResult<ValidateCallbackResult> {
+    let try_properties: Result<AppProperties, _> =_data.dna_info.properties.try_into();
+    let properties: AppProperties = match try_properties {
+        Ok(properties) => {
+            properties
+        }
+        Err(_) => {return Ok(ValidateCallbackResult::Valid)}
+    };
+    debug!("dna_info: {:?}", properties);
+    // we must have some properties now, which means we also need a membrane proof
+    let membrane_proof = match _data.membrane_proof {
+        Some(proof) => {
+            // we have some membrane proof
+            let mem_proof = Arc::<hdi::prelude::SerializedBytes>::try_unwrap(proof).ok().unwrap();
+            let try_membrane_proof: Result<MemProof, _> = mem_proof.try_into();
+            match try_membrane_proof {
+                Ok(r) => r,
+                Err(_) => {return Ok(ValidateCallbackResult::Valid)}
+            }
+        }
+        // we have properties but no membrane proof
+        None => return Ok(ValidateCallbackResult::Invalid(String::from("No membrane proof")))
+    };
+    debug!("membrane_proof: {:?}", membrane_proof);
+    // validate the evm key binding
+    let mut address_array = [0u8; 20];
+    address_array.copy_from_slice(membrane_proof.evm_key_binding.evm_key.into_vec().as_slice());
+    let address = H160::from(address_array);
+    let signature: ethers_core::types::Signature = membrane_proof.evm_key_binding.signature_bytes.into_vec().as_slice().try_into().unwrap();
+    let message: RecoveryMessage = _data.agent_key.get_raw_39().try_into().ok().unwrap();
+    let verified = signature.verify(message, address);
+    if !verified.is_ok() {
+        return Ok(
+            ValidateCallbackResult::Invalid(
+                String::from("EVM pubkey binding signature is invalid"),
+            ),
+        )
+    }    
+
+    // ensure the signer of the token proof is the same signer in the app properties
+    let properties_signer: Vec<u8> = hex::decode(properties.signer.strip_prefix("0x").unwrap_or(&properties.signer)).unwrap();
+
+    if !membrane_proof.token_proof.signer_address.clone().into_vec().as_slice().eq(
+        properties_signer.as_slice()
+    ) {
+        return Ok(
+            ValidateCallbackResult::Invalid(
+                String::from("Token proof signer address does not match app properties signer address"),
+            ),
+        )
+    }
+
+    // concatenate the token, owner, balance and block into one [u8]
+
+    // verify that the message is the same as the concatenated [u8]
+
+    // verify the signature of the message against the signer of the proof
+    let proof_signer: H160 = H160::from_slice(membrane_proof.token_proof.signer_address.clone().into_vec().as_slice());
+    let signature: ethers_core::types::Signature = membrane_proof.token_proof.signature.into_vec().as_slice().try_into().unwrap();
+    let message = membrane_proof.token_proof.message.into_vec();
+    let hash = hash_keccak256(message).ok().unwrap();
+    let verified = signature.verify(hash, proof_signer);
+    if !verified.is_ok() {
+        return Ok(
+            ValidateCallbackResult::Invalid(
+                String::from("Token proof signature is invalid"),
+            ),
+        )
+    }    
+
+    // ensure that the evm key in the evm key binding is the same as the owner key in the token proof
+    let proof_owner: H160 = H160::from_slice(membrane_proof.token_proof.owner.clone().into_vec().as_slice());
+    if !proof_owner.eq(&address) {
+        return Ok(
+            ValidateCallbackResult::Invalid(
+                String::from("Token proof owner does not match evm key binding evm key"),
+            ),
+        )
+    }
+
+    // ensure that the user's balance in the token proof is greater than the threshold in the dna properties
+    let proof_balance: U256 = U256::from_big_endian(membrane_proof.token_proof.balance.clone().into_vec().as_slice());
+    let dna_threshold: Vec<u8> = hex::decode(properties.threshold.strip_prefix("0x").unwrap_or(&properties.threshold)).unwrap();
+    let dna_threshold: U256 = U256::from_big_endian(dna_threshold.as_slice());
+    if proof_balance < dna_threshold {
+        return Ok(
+            ValidateCallbackResult::Invalid(
+                String::from("Token proof balance is less than dna threshold. Threshold: ") + &dna_threshold.to_string() + &String::from(" Balance: ") + &proof_balance.to_string()
+            ),
+        )
+    }
+
+    // otherwise ok
     Ok(ValidateCallbackResult::Valid)
 }
 pub fn validate_agent_joining(
     _agent_pub_key: AgentPubKey,
     _membrane_proof: &Option<MembraneProof>,
 ) -> ExternResult<ValidateCallbackResult> {
-    // return Ok(ValidateCallbackResult::Invalid(String::from("nope")));
-    debug!("Hello from debug!");
-    println!("Hello from println!");
-    let dna_info: Result<AppProperties, _> = dna_info().ok().unwrap().properties.try_into();
-    match dna_info {
-        Ok(dna_info) => {
-            info!("dna_info {:?}", dna_info);
-            // implement the check against the membrane proof here
-            debug!("dna_info: {:?}", dna_info);
-            Ok(ValidateCallbackResult::Valid)
-        }
-        Err(_) => Ok(ValidateCallbackResult::Invalid(String::from("didn't work")))
-    }
+    return Ok(ValidateCallbackResult::Valid);
+    // debug!("Hello from debug!");
+    // println!("Hello from println!");
+    // let dna_info: Result<AppProperties, _> = dna_info().ok().unwrap().properties.try_into();
+    // match dna_info {
+    //     Ok(dna_info) => {
+    //         info!("dna_info {:?}", dna_info);
+    //         // implement the check against the membrane proof here
+    //         debug!("dna_info: {:?}", dna_info);
+    //         Ok(ValidateCallbackResult::Valid)
+    //     }
+    //     Err(_) => Ok(ValidateCallbackResult::Invalid(String::from("didn't work")))
+    // }
 }
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {

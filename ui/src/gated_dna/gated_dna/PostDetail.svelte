@@ -8,6 +8,7 @@
     EntryHash,
     AgentPubKey,
     DnaHash,
+    CellId,
   } from "@holochain/client";
   import { clientContext } from "../../contexts";
   import type { Post } from "./types";
@@ -18,6 +19,7 @@
   export let postHash: ActionHash;
 
   let client: AppAgentClient = (getContext(clientContext) as any).getClient();
+  export let cellId: CellId;
 
   let loading = true;
   let error: any = undefined;
@@ -49,13 +51,15 @@
     try {
       record = await client.callZome({
         cap_secret: null,
-        role_name: "gated_dna",
+        cell_id: cellId,
+        // role_name: "gated_dna",
         zome_name: "gated_dna",
         fn_name: "get_post",
         payload: postHash,
       });
       if (record) {
         post = decode((record.entry as any).Present.entry) as Post;
+        console.log(post);
       }
     } catch (e) {
       error = e;
@@ -91,18 +95,6 @@
   </div>
 {:else if error}
   <span>Error fetching the post: {error.data.data}</span>
-{:else if editing}
-  <EditPost
-    originalPostHash={postHash}
-    currentRecord={record}
-    on:post-updated={async () => {
-      editing = false;
-      await fetchPost();
-    }}
-    on:edit-canceled={() => {
-      editing = false;
-    }}
-  />
 {:else}
   <div style="display: flex; flex-direction: column">
     <div style="display: flex; flex-direction: row">
@@ -123,7 +115,7 @@
 
     <div style="display: flex; flex-direction: row; margin-bottom: 16px">
       <span style="margin-right: 4px"><strong>Message:</strong></span>
-      <span style="white-space: pre-line">{post.message}</span>
+      <span style="white-space: pre-line">{post?.message}</span>
     </div>
   </div>
 {/if}

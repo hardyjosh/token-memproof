@@ -11,3 +11,4 @@ name = "lobby_integrity"
 hdi = { workspace = true }
 
 serde = { workspace = true }
+ethers-core = { version = "2.0.5"}

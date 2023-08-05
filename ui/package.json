@@ -16,6 +16,7 @@
     "@web3modal/html": "^2.7.1",
     "flowbite": "^1.7.0",
     "flowbite-svelte": "^0.40.2",
+    "svelte-heros-v2": "^0.9.5",
     "svelte-wagmi-stores": "^0.0.3",
     "tailwind-merge": "^1.14.0",
     "viem": "^1.4.2"

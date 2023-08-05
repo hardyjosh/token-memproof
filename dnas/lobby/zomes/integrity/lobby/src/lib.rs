@@ -1,3 +1,5 @@
+pub mod evm_key_binding;
+pub use evm_key_binding::*;
 pub mod token_gated_room;
 pub use token_gated_room::*;
 use hdi::prelude::*;
@@ -7,6 +9,7 @@ use hdi::prelude::*;
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     TokenGatedRoom(TokenGatedRoom),
+    EvmKeyBinding(EvmKeyBinding),
 }
 #[derive(Serialize, Deserialize)]
 #[hdk_link_types]
@@ -16,12 +19,9 @@ pub enum LinkTypes {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct ByteArray(#[serde(with = "serde_bytes")] Vec<u8>);
 impl ByteArray {
-    // Add a public method to create a new ByteArray from a Vec<u8>
     pub fn new(vec: Vec<u8>) -> Self {
         ByteArray(vec)
     }
-    
-    // Add a public method to convert ByteArray into a Vec<u8>
     pub fn into_vec(self) -> Vec<u8> {
         self.0
     }
@@ -36,7 +36,6 @@ pub fn validate_agent_joining(
     _agent_pub_key: AgentPubKey,
     _membrane_proof: &Option<MembraneProof>,
 ) -> ExternResult<ValidateCallbackResult> {
-    // do signature validation etc here
     Ok(ValidateCallbackResult::Valid)
 }
 #[hdk_extern]
@@ -52,6 +51,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                                 token_gated_room,
                             )
                         }
+                        EntryTypes::EvmKeyBinding(evm_key_binding) => {
+                            validate_create_evm_key_binding(
+                                EntryCreationAction::Create(action),
+                                evm_key_binding,
+                            )
+                        }
                     }
                 }
                 OpEntry::UpdateEntry { app_entry, action, .. } => {
@@ -60,6 +65,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                             validate_create_token_gated_room(
                                 EntryCreationAction::Update(action),
                                 token_gated_room,
+                            )
+                        }
+                        EntryTypes::EvmKeyBinding(evm_key_binding) => {
+                            validate_create_evm_key_binding(
+                                EntryCreationAction::Update(action),
+                                evm_key_binding,
                             )
                         }
                     }
@@ -76,6 +87,17 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     action,
                 } => {
                     match (app_entry, original_app_entry) {
+                        (
+                            EntryTypes::EvmKeyBinding(evm_key_binding),
+                            EntryTypes::EvmKeyBinding(original_evm_key_binding),
+                        ) => {
+                            validate_update_evm_key_binding(
+                                action,
+                                evm_key_binding,
+                                original_action,
+                                original_evm_key_binding,
+                            )
+                        }
                         (
                             EntryTypes::TokenGatedRoom(token_gated_room),
                             EntryTypes::TokenGatedRoom(original_token_gated_room),
@@ -109,6 +131,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                                 action,
                                 original_action,
                                 token_gated_room,
+                            )
+                        }
+                        EntryTypes::EvmKeyBinding(evm_key_binding) => {
+                            validate_delete_evm_key_binding(
+                                action,
+                                original_action,
+                                evm_key_binding,
                             )
                         }
                     }
@@ -164,6 +193,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                                 token_gated_room,
                             )
                         }
+                        EntryTypes::EvmKeyBinding(evm_key_binding) => {
+                            validate_create_evm_key_binding(
+                                EntryCreationAction::Create(action),
+                                evm_key_binding,
+                            )
+                        }
                     }
                 }
                 OpRecord::UpdateEntry {
@@ -213,6 +248,37 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                                     token_gated_room,
                                     original_action,
                                     original_token_gated_room,
+                                )
+                            } else {
+                                Ok(result)
+                            }
+                        }
+                        EntryTypes::EvmKeyBinding(evm_key_binding) => {
+                            let result = validate_create_evm_key_binding(
+                                EntryCreationAction::Update(action.clone()),
+                                evm_key_binding.clone(),
+                            )?;
+                            if let ValidateCallbackResult::Valid = result {
+                                let original_evm_key_binding: Option<EvmKeyBinding> = original_record
+                                    .entry()
+                                    .to_app_option()
+                                    .map_err(|e| wasm_error!(e))?;
+                                let original_evm_key_binding = match original_evm_key_binding {
+                                    Some(evm_key_binding) => evm_key_binding,
+                                    None => {
+                                        return Ok(
+                                            ValidateCallbackResult::Invalid(
+                                                "The updated entry type must be the same as the original entry type"
+                                                    .to_string(),
+                                            ),
+                                        );
+                                    }
+                                };
+                                validate_update_evm_key_binding(
+                                    action,
+                                    evm_key_binding,
+                                    original_action,
+                                    original_evm_key_binding,
                                 )
                             } else {
                                 Ok(result)
@@ -277,6 +343,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                                 action,
                                 original_action,
                                 original_token_gated_room,
+                            )
+                        }
+                        EntryTypes::EvmKeyBinding(original_evm_key_binding) => {
+                            validate_delete_evm_key_binding(
+                                action,
+                                original_action,
+                                original_evm_key_binding,
                             )
                         }
                     }

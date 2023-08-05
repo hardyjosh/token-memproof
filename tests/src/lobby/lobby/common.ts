@@ -22,3 +22,23 @@ export async function createTokenGatedRoom(cell: CallableCell, tokenGatedRoom = 
     });
 }
 
+
+
+export async function sampleEvmKeyBinding(cell: CallableCell, partialEvmKeyBinding = {}) {
+    return {
+        ...{
+	  evm_key: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+	  signature_bytes: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+        },
+        ...partialEvmKeyBinding
+    };
+}
+
+export async function createEvmKeyBinding(cell: CallableCell, evmKeyBinding = undefined): Promise<Record> {
+    return cell.callZome({
+      zome_name: "lobby",
+      fn_name: "create_evm_key_binding",
+      payload: evmKeyBinding || await sampleEvmKeyBinding(cell),
+    });
+}
+

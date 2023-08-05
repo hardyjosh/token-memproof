@@ -1,3 +1,4 @@
+pub mod evm_key_binding;
 pub mod all_lobbies;
 pub mod token_gated_room;
 use hdk::prelude::*;

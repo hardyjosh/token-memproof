@@ -36,6 +36,7 @@ export type LobbySignal = {
 };
 
 export type EntryTypes =
+  | ({ type: 'EvmKeyBinding'; } & EvmKeyBinding)
   | ({ type: 'TokenGatedRoom'; } & TokenGatedRoom);
 
 
@@ -47,6 +48,39 @@ export interface TokenGatedRoom {
 
   signer: Uint8Array;
 
-  threshold: number;
+  threshold: Uint8Array;
 }
 
+
+
+
+export interface EvmKeyBinding {
+  evm_key: Uint8Array;
+
+  signature_bytes: Uint8Array;
+}
+
+export interface TokenProof {
+  token: Uint8Array;
+  owner: Uint8Array;
+  signer_address: Uint8Array;
+  balance: Uint8Array;
+  block: Uint8Array;
+  message: Uint8Array;
+  signature: Uint8Array;
+}
+
+export interface TokenProofResponse {
+  token: Uint8Array;
+  owner: Uint8Array;
+  signer_address: Uint8Array;
+  balance: string;
+  block: string;
+  message: Uint8Array;
+  signature: Uint8Array;
+}
+
+export interface MemProof {
+  token_proof: TokenProof;
+  evm_key_binding: EvmKeyBinding;
+}

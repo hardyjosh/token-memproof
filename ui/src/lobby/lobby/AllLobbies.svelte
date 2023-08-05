@@ -56,7 +56,7 @@
     <Spinner />
   </div>
 {:else if error}
-  <span>Error fetching the token gated rooms: {error.data.data}.</span>
+  <span>Error fetching the token gated rooms: {error?.data?.data}.</span>
 {:else if hashes.length === 0}
   <span>No token gated rooms found.</span>
 {:else}

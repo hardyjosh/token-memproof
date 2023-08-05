@@ -1,16 +1,19 @@
 <script lang="ts">
   import { createEventDispatcher, getContext, onMount } from "svelte";
-  import type {
-    AppAgentClient,
-    Record,
-    EntryHash,
-    AgentPubKey,
-    ActionHash,
-    DnaHash,
+  import {
+    type AppAgentClient,
+    type Record,
+    type EntryHash,
+    type AgentPubKey,
+    type ActionHash,
+    type DnaHash,
+    type RoleName,
+    encodeHashToBase64,
   } from "@holochain/client";
   import { clientContext } from "../../contexts";
   import type { Post } from "./types";
   import { Button, Input } from "flowbite-svelte";
+  import { addSnackBar } from "../../lib/snackbar/snackbar";
 
   export let cellId: [DnaHash, AgentPubKey];
 
@@ -33,21 +36,26 @@
     };
 
     try {
+      console.log("cell id whilst creating post", {
+        dna: encodeHashToBase64(cellId?.[0] || new Uint8Array(0)),
+        agentKey: encodeHashToBase64(cellId?.[1] || new Uint8Array(0)),
+      });
       const record: Record = await client.callZome({
         cell_id: cellId,
         cap_secret: null,
-        role_name: "gated_dna",
         zome_name: "gated_dna",
         fn_name: "create_post",
         payload: postEntry,
       });
       dispatch("post-created", { postHash: record.signed_action.hashed.hash });
     } catch (e) {
-      errorSnackbar.labelText = `Error creating the post: ${e.data.data}`;
-      errorSnackbar.show();
+      addSnackBar(`Error creating the evm key binding: ${e?.data?.data || e}`);
+      // errorSnackbar.labelText = `Error creating the post: ${
+      //   e?.data?.data || e
+      // }`;
+      // errorSnackbar.show();
     }
   }
-  $: console.log(message);
 </script>
 
 <div class="flex flex-col gap-y-4">

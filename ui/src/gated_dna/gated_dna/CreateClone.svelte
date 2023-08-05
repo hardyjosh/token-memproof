@@ -5,24 +5,37 @@
   import type { AppAgentClient, Record } from "@holochain/client";
   import { getContext } from "svelte";
   import { decode, encode } from "@msgpack/msgpack";
-  import { toBytes } from "viem";
+  import {
+    getAddress,
+    numberToBytes,
+    numberToHex,
+    parseUnits,
+    toBytes,
+  } from "viem";
   import type { AppProperties } from "./types.js";
+  import { fetchToken } from "@wagmi/core";
+  import { parse } from "svelte/compiler";
 
   let client: AppAgentClient = (getContext(clientContext) as any).getClient();
 
   let appProperties: AppProperties = {
-    name: "",
-    signer: "",
-    token: "",
-    threshold: 0,
+    name: "hi",
+    signer: "0x3cDB3d9e1B74692Bb1E3bb5fc81938151cA64b02",
+    token: "0x6c6EE5e31d828De241282B9606C8e98Ea48526E2",
+    threshold: 10,
   };
 
   async function createTokenGatedRoom() {
+    const address = getAddress(appProperties.token);
+    console.log(address);
+    const token = await fetchToken({ address, chainId: 80001 });
     const tokenGatedRoom: TokenGatedRoom = {
       name: appProperties.name,
       signer: toBytes(appProperties.signer),
       token: toBytes(appProperties.token),
-      threshold: Number(appProperties.threshold),
+      threshold: numberToBytes(
+        parseUnits(appProperties.threshold.toString(), token.decimals)
+      ),
     };
     try {
       const record: Record = await client.callZome({

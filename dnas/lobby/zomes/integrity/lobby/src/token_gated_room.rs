@@ -6,12 +6,19 @@ pub struct TokenGatedRoom {
     pub name: String,
     pub token: ByteArray,
     pub signer: ByteArray,
-    pub threshold: u32,
+    pub threshold: ByteArray,
 }
 pub fn validate_create_token_gated_room(
     _action: EntryCreationAction,
     _token_gated_room: TokenGatedRoom,
 ) -> ExternResult<ValidateCallbackResult> {
+    if *_action.action_seq() < 5u32 {
+        return Ok(
+            ValidateCallbackResult::Invalid(
+                String::from("EVM pubkey binding must be the first action after genesis"),
+            ),
+        )
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 pub fn validate_update_token_gated_room(
@@ -43,7 +50,6 @@ pub fn validate_create_link_all_lobbies(
     target_address: AnyLinkableHash,
     _tag: LinkTag,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Check the entry type for the given action hash
     let action_hash = ActionHash::from(target_address);
     let record = must_get_valid_record(action_hash)?;
     let _token_gated_room: crate::TokenGatedRoom = record
@@ -55,7 +61,6 @@ pub fn validate_create_link_all_lobbies(
                 WasmErrorInner::Guest(String::from("Linked action must reference an entry"))
             ),
         )?;
-    // TODO: add the appropriate validation rules
     Ok(ValidateCallbackResult::Valid)
 }
 pub fn validate_delete_link_all_lobbies(

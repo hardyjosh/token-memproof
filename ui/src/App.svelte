@@ -39,7 +39,7 @@
 
   // except here we're using createConfig form this package instead of wagmi
   const wagmiConfig = createConfig({
-    autoConnect: false,
+    autoConnect: true,
     connectors: w3mConnectors({ projectId, chains }),
     publicClient,
   });
@@ -74,7 +74,7 @@
 
 <main class="relative w-full">
   <div class="flex justify-between p-4 border-b">
-    <span class="text-blue-500 text-2xl">Memproof</span>
+    <span class="text-blue-500 text-2xl">DAO chat</span>
     <div class="flex flex-row text-sm gap-x-4">
       <div class="flex flex-col">
         <span>Bound EVM key</span>

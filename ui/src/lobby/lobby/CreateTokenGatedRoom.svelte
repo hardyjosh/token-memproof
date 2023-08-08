@@ -21,7 +21,7 @@
   let client: AppAgentClient = (getContext(clientContext) as any).getClient();
 
   let appProperties: AppProperties = {
-    name: "hi",
+    name: "my room",
     signer: "0x3cDB3d9e1B74692Bb1E3bb5fc81938151cA64b02",
     token: "0x2Eb1D24aB0eC5FD0058ab5073F1EA2d8A59783E5",
     threshold: 10,

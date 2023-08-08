@@ -13,7 +13,7 @@
   import { clientContext } from "../../contexts";
   import type { MemProof, TokenGatedRoom } from "./types";
   import { bytesToBigint, formatEther, toHex } from "viem";
-  import { fetchToken } from "@wagmi/core";
+  import { fetchBalance, fetchToken } from "@wagmi/core";
   import { account } from "svelte-wagmi-stores";
   import { Button } from "flowbite-svelte";
   import CreatePost from "../../gated_dna/gated_dna/CreatePost.svelte";
@@ -21,6 +21,7 @@
   import { fetchTokenProof } from "../../lib/fetch_proof";
   import AllPosts from "../../gated_dna/gated_dna/AllPosts.svelte";
   import { areUint8ArraysEqual } from "../../lib/utils";
+  import { addSnackBar } from "../../lib/snackbar/snackbar.js";
 
   const dispatch = createEventDispatcher();
 
@@ -46,6 +47,9 @@
     signer: string;
   }
   let tokenGatedRoomDisplay: TokenGatedRoomDisplay | undefined;
+
+  let hasEnoughTokens = false;
+  let balanceVal: bigint | undefined;
 
   $: error, loading, record, tokenGatedRoom;
 
@@ -74,6 +78,15 @@
       }
     )?.cloned;
     // console.log({ matchingClone });
+    const balance = await fetchBalance({
+      address: $account.address,
+      token: toHex(tokenGatedRoom.token),
+    });
+    balanceVal = balance.value;
+
+    const threshold = bytesToBigint(tokenGatedRoom.threshold);
+    hasEnoughTokens = balance.value >= threshold;
+
     if (existingClone) {
       cellId = existingClone.cell_id;
       cloneId = existingClone.clone_id;
@@ -140,7 +153,16 @@
         },
         membrane_proof: encode(membrane_proof),
       })
-      .catch((e) => console.log(e));
+      .catch((e) => {
+        let message = e?.message;
+        if (typeof message == "string") {
+          if (message.includes("threshold")) {
+            addSnackBar("You don't have enough tokens to join this room");
+            return;
+          }
+        }
+        console.log(e);
+      });
     cellId = clone?.cell_id;
     cloneId = clone?.clone_id;
   };
@@ -155,7 +177,7 @@
 {:else if error}
   <span>Error fetching the token gated room: {error?.data?.data || error}</span>
 {:else}
-  <div class="flex flex-col gap-y-2">
+  <div class="flex flex-col gap-y-2 overflow-hidden">
     <div class="flex flex-col">
       <span><strong>Name:</strong></span>
       <span>{tokenGatedRoomDisplay.name}</span>
@@ -165,12 +187,18 @@
       <span>{tokenGatedRoomDisplay.token}</span>
     </div>
     <div class="flex flex-col">
-      <span><strong>Signer:</strong></span>
-      <span>{tokenGatedRoomDisplay.signer}</span>
+      <span><strong>Threshold:</strong></span>
+      <span>{tokenGatedRoomDisplay.threshold}</span>
     </div>
     <div class="flex flex-col">
-      <span><strong>Threshold:</strong></span>
-      <span>{tokenGatedRoomDisplay.threshold} </span>
+      <span><strong>Your balance:</strong></span>
+      {#if balanceVal}
+        <span>{formatEther(balanceVal)}</span>
+      {/if}
+    </div>
+    <div class="flex flex-col">
+      <span><strong>Trusted proof signer:</strong></span>
+      <span>{tokenGatedRoomDisplay.signer}</span>
     </div>
     {#if cellId}
       <Button
